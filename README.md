@@ -58,10 +58,10 @@ Causes boki to not do anything to the window borders.
 	-r, --resize
 Causes boki to remove all window styles EXCEPT the resize handles.
 
-	-a, --args
+	-a, --args=VALUE
 A string containing arguments to pass to the executable in --run.
 
-	-d, --delay
+	-d, --delay=VALUE
 Adds a delay before doing anything to the window.
 
 	-v, --ver, --version

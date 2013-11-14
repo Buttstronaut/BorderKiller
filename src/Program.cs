@@ -45,7 +45,7 @@ namespace BorderKiller {
 				.Add("f|fs|fullscreen", "The same as --pos --size", v => FullScreen = v != null)
 				.Add("n|nothing", "Do nothing to window borders", v => DoNothing = v != null)
 				.Add("r|resize", "Leave window resize handles intact", v => LeaveHandles = v != null)
-				.Add("a:|args:", "Arguments to pass to --run", v => RunArgs = v)
+				.Add("a=|args=", "Arguments to pass to --run", v => RunArgs = v)
 				.Add("d=|delay=", "Adds a delay before borderlessing\n This is very useful when used with --run", (int v) => Delay = v)
 				.Add("v|ver|version", "Print version and exit", v => PrintVersion())
 				.Add("?|h|help", "Print this help and exit", v => ShowHelp = v != null)
@@ -68,47 +68,11 @@ namespace BorderKiller {
 			if (ShowHelp)
 				PrintHelp(ArgParser);
 			
-			if (RunPath != "") {
-				try {
-					//Sets up the ProcessStartInfo for --run with arguments from --args
-					ProcessStartInfo ProcSI = new ProcessStartInfo(RunPath, RunArgs);
-					ProcSI.UseShellExecute = false;
-
-					//Get the parent directory of the executable from --run and set the PSI's working dir to it
-					string WDir = Directory.GetParent(RunPath).FullName;
-					ProcSI.WorkingDirectory = WDir;
-
-					Console.WriteLine("boki: Running {0} {1}", RunPath, RunArgs);
-
-					//Then start the process
-					Process PRunning = Process.Start(ProcSI);
-
-					//Then wait a second to allow the process to actually GET a window handle
-					System.Threading.Thread.Sleep(1000);
-
-					//Before assigning it to UsingWindow
-					UsingWindow = new Window(PRunning.MainWindowHandle);
-				}
-				catch (System.ComponentModel.Win32Exception X) { //This should only happen with an invalid --run path or with inadequate permissions (I hope!)
-					Console.WriteLine("boki: Error running {0}: {1}", RunPath, X.Message);
-				}
-			}
+			if (RunPath != "") //Run an executable
+				UsingWindow = RunExe(RunPath, RunArgs);
 
 			//Got a delay, so wait n seconds and do some fancy printing much like scrot -cd n
-			if (Delay > 0) {
-				int Waiting = Delay - 1;
-
-				Console.Write("boki: Waiting for {0} seconds... {0}... ", Delay);
-				System.Threading.Thread.Sleep(1000);
-				do {
-					Console.Write("{0}... ", Waiting);
-					Waiting--;
-
-					System.Threading.Thread.Sleep(1000);
-				} while (Waiting > 0);
-
-				Console.WriteLine();
-			}
+			WaitForDelay(Delay);
 			
 			//And finally, borderless, resize and move the given window
 			if (UsingWindow.Handle != IntPtr.Zero) {
@@ -129,12 +93,59 @@ namespace BorderKiller {
 			}
 		}
 
+		//Causes the thread to sleep for n seconds
+		public static void WaitForDelay(int Delay) {
+			if (Delay > 0) {
+				int Waiting = Delay - 1;
+
+				Console.Write("boki: Waiting for {0} seconds... {0}... ", Delay);
+				System.Threading.Thread.Sleep(1000);
+				do {
+					Console.Write("{0}... ", Waiting);
+					Waiting--;
+
+					System.Threading.Thread.Sleep(1000);
+				} while (Waiting > 0);
+
+				Console.WriteLine();
+			}
+		}
+
+		public static Window RunExe(string RunPath, string RunArgs) {
+			try {
+				//Sets up the ProcessStartInfo for --run with arguments from --args
+				ProcessStartInfo ProcSI = new ProcessStartInfo(RunPath, RunArgs);
+				ProcSI.UseShellExecute = false;
+
+				//Get the parent directory of the executable from --run and set the PSI's working dir to it
+				string WDir = Directory.GetParent(RunPath).FullName;
+				ProcSI.WorkingDirectory = WDir;
+
+				Console.WriteLine("boki: Running {0} {1}", RunPath, RunArgs);
+
+				//Then start the process
+				Process PRunning = Process.Start(ProcSI);
+
+				//Then wait a second to allow the process to actually GET a window handle
+				System.Threading.Thread.Sleep(1000);
+
+				//Before returning the new Window
+				return new Window(PRunning.MainWindowHandle);
+			}
+			catch (System.ComponentModel.Win32Exception X) { //This should only happen with an invalid --run path or with inadequate permissions (I hope!)
+				Console.WriteLine("boki: Error running {0}: {1}", RunPath, X.Message);
+				Environment.Exit(1);
+				return new Window();
+			}
+		}
+
 		//Converts a string in the format "WIDTHxHEIGHT" to a Size(WIDTH, HEIGHT)
 		public static Size WxHToSize(string input = null) {
 			if (String.IsNullOrEmpty(input)) {
 				return new Size(Screen.PrimaryScreen.WorkingArea.Width, Screen.PrimaryScreen.WorkingArea.Height);
 			}
 			else {
+				//Matches NUMBERxNUMBER, with support for negative values, and puts the left side of the x in group w and the right in group h
 				Match SizeMatch = Regex.Match(input, @"(?<w>(?:-|)[0-9]*)x(?<h>(?:-|)[0-9]*)");
 				return new Size(Convert.ToInt32(SizeMatch.Groups["w"].Value.ToString())
 								, Convert.ToInt32(SizeMatch.Groups["h"].Value.ToString()));
@@ -147,6 +158,7 @@ namespace BorderKiller {
 				return new Point(0, 0);
 			}
 			else {
+				//Same as the regex above, but XxY and groups x/y
 				Match SizeMatch = Regex.Match(input, @"(?<x>(?:-|)[0-9]*)x(?<y>(?:-|)[0-9]*)");
 				return new Point(Convert.ToInt32(SizeMatch.Groups["x"].Value.ToString())
 								, Convert.ToInt32(SizeMatch.Groups["y"].Value.ToString()));
