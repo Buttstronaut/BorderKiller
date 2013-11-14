@@ -67,10 +67,18 @@ namespace BorderKiller {
 			//If we've broken something or requested help, show help before anything actually happens
 			if (ShowHelp)
 				PrintHelp(ArgParser);
-			
-			if (RunPath != "") //Run an executable
-				UsingWindow = RunExe(RunPath, RunArgs);
 
+			if (RunPath != "") {  //Run an executable
+				Console.WriteLine("boki: Running {0} {1}", RunPath, RunArgs);
+				
+				try {
+					UsingWindow = FakeFullscreen.RunExe(RunPath, RunArgs);
+				}
+				catch (System.ComponentModel.Win32Exception X) { //This should only happen with an invalid --run path or with inadequate permissions (I think!)
+					Console.WriteLine("boki: Error running {0}: {1}", RunPath, X.Message);
+					Environment.Exit(1);
+				}
+			}
 			//Got a delay, so wait n seconds and do some fancy printing much like scrot -cd n
 			WaitForDelay(Delay);
 			
@@ -83,10 +91,10 @@ namespace BorderKiller {
 
 				//Got a resize string or FullScreen arg, so resize
 				if (!string.IsNullOrEmpty(SizeString) || FullScreen)
-					UsingWindow.Resize(WxHToSize(SizeString));
+					UsingWindow.Resize(FakeFullscreen.WxHToSize(SizeString));
 				//Same as above but move
 				if (!string.IsNullOrEmpty(PosString) || FullScreen)
-					UsingWindow.Move(XxYToPoint(PosString));
+					UsingWindow.Move(FakeFullscreen.XxYToPoint(PosString));
 			}
 			else {
 				Console.WriteLine("boki: No window found!");
@@ -94,6 +102,7 @@ namespace BorderKiller {
 		}
 
 		//Causes the thread to sleep for n seconds
+		//Also prints a swanky countdown
 		public static void WaitForDelay(int Delay) {
 			if (Delay > 0) {
 				int Waiting = Delay - 1;
@@ -110,60 +119,6 @@ namespace BorderKiller {
 				Console.WriteLine();
 			}
 		}
-
-		public static Window RunExe(string RunPath, string RunArgs) {
-			try {
-				//Sets up the ProcessStartInfo for --run with arguments from --args
-				ProcessStartInfo ProcSI = new ProcessStartInfo(RunPath, RunArgs);
-				ProcSI.UseShellExecute = false;
-
-				//Get the parent directory of the executable from --run and set the PSI's working dir to it
-				string WDir = Directory.GetParent(RunPath).FullName;
-				ProcSI.WorkingDirectory = WDir;
-
-				Console.WriteLine("boki: Running {0} {1}", RunPath, RunArgs);
-
-				//Then start the process
-				Process PRunning = Process.Start(ProcSI);
-
-				//Then wait a second to allow the process to actually GET a window handle
-				System.Threading.Thread.Sleep(1000);
-
-				//Before returning the new Window
-				return new Window(PRunning.MainWindowHandle);
-			}
-			catch (System.ComponentModel.Win32Exception X) { //This should only happen with an invalid --run path or with inadequate permissions (I hope!)
-				Console.WriteLine("boki: Error running {0}: {1}", RunPath, X.Message);
-				Environment.Exit(1);
-				return new Window();
-			}
-		}
-
-		//Converts a string in the format "WIDTHxHEIGHT" to a Size(WIDTH, HEIGHT)
-		public static Size WxHToSize(string input = null) {
-			if (String.IsNullOrEmpty(input)) {
-				return new Size(Screen.PrimaryScreen.WorkingArea.Width, Screen.PrimaryScreen.WorkingArea.Height);
-			}
-			else {
-				//Matches NUMBERxNUMBER, with support for negative values, and puts the left side of the x in group w and the right in group h
-				Match SizeMatch = Regex.Match(input, @"(?<w>(?:-|)[0-9]*)x(?<h>(?:-|)[0-9]*)");
-				return new Size(Convert.ToInt32(SizeMatch.Groups["w"].Value.ToString())
-								, Convert.ToInt32(SizeMatch.Groups["h"].Value.ToString()));
-			}
-		}
-
-		//Same as above but "XxY" to Point(X, Y)
-		public static Point XxYToPoint(string input = null) {
-			if (String.IsNullOrEmpty(input)) {
-				return new Point(0, 0);
-			}
-			else {
-				//Same as the regex above, but XxY and groups x/y
-				Match SizeMatch = Regex.Match(input, @"(?<x>(?:-|)[0-9]*)x(?<y>(?:-|)[0-9]*)");
-				return new Point(Convert.ToInt32(SizeMatch.Groups["x"].Value.ToString())
-								, Convert.ToInt32(SizeMatch.Groups["y"].Value.ToString()));
-			}
-		}
 		
 		//Prints the version and exits
 		public static void PrintVersion() {
@@ -177,9 +132,10 @@ namespace BorderKiller {
 			Console.WriteLine(@"BorderKiller v{0}
 USAGE: {1} [OPTIONS]
 Removes window captions and borders from windows as well as optionally resizing and moving them.
-",
- typeof(Program).Assembly.GetName().Version.ToString().Split('.').Take(3).Aggregate((a, b) => a + "." + b),
- ExeName);
+
+Arguments:",
+			typeof(Program).Assembly.GetName().Version.ToString().Split('.').Take(3).Aggregate((a, b) => a + "." + b),
+			ExeName);
 
   opt.WriteOptionDescriptions(Console.Out);
 			Environment.Exit(1);

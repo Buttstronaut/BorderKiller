@@ -6,6 +6,8 @@ using System.Drawing;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Runtime.InteropServices;
+using System.IO;
+using System.Windows.Forms;
 
 namespace FFS {
 	class FakeFullscreen {	
@@ -105,12 +107,77 @@ namespace FFS {
 			return new Window();
 		}
 
-		//Simple, sort of hacky string comparison that supports wildcards
-		//Literally just replaces * in the input with a regex catchall then compares the input with the new catchall'd string
+		/// <summary>
+		/// Runs an executable and returns a Window representing its main window
+		/// </summary>
+		/// <param name="RunPath">The executable to run</param>
+		/// <param name="RunArgs">Arguments to pass to the executable</param>
+		/// <returns></returns>
+		public static Window RunExe(string RunPath, string RunArgs = "") {
+			//Sets up the ProcessStartInfo for --run with arguments from --args
+			ProcessStartInfo ProcSI = new ProcessStartInfo(RunPath, RunArgs);
+			ProcSI.UseShellExecute = false;
+
+			//Get the parent directory of the executable from --run and set the PSI's working dir to it
+			string WDir = Directory.GetParent(RunPath).FullName;
+			ProcSI.WorkingDirectory = WDir;
+
+			//Then start the process
+			Process PRunning = Process.Start(ProcSI);
+
+			//Then wait a second to allow the process to actually GET a window handle
+			System.Threading.Thread.Sleep(1000);
+
+			//Before returning the new Window
+			return new Window(PRunning.MainWindowHandle);
+		}
+
+		#region Helper functions
+		/// <summary>
+		/// Compares input to pattern, allowing wildcards in pattern
+		/// </summary>
+		/// <param name="input">The string to compare to pattern</param>
+		/// <param name="pattern">The string to use as a pattern, supports wildcards with *</param>
+		/// <returns></returns>
 		private static bool Like(string input, string pattern) {
 			string tmp = pattern.Replace("*", ".*");
 			return System.Text.RegularExpressions.Regex.IsMatch(input, tmp, RegexOptions.IgnoreCase);
 		}
+		
+		/// <summary>
+		/// Converts a string in the format "WIDTHxHEIGHT" to a Size(WIDTH, HEIGHT) 
+		/// </summary>
+		/// <param name="input">The input string in WIDTHxHEIGHT format</param>
+		/// <returns></returns>
+		public static Size WxHToSize(string input = "") {
+			if (String.IsNullOrEmpty(input)) {
+				return new Size(Screen.PrimaryScreen.WorkingArea.Width, Screen.PrimaryScreen.WorkingArea.Height);
+			}
+			else {
+				//Matches NUMBERxNUMBER, with support for negative values, and puts the left side of the x in group w and the right in group h
+				Match SizeMatch = Regex.Match(input, @"(?<w>(?:-|)[0-9]*)x(?<h>(?:-|)[0-9]*)");
+				return new Size(Convert.ToInt32(SizeMatch.Groups["w"].Value.ToString())
+								, Convert.ToInt32(SizeMatch.Groups["h"].Value.ToString()));
+			}
+		}
+
+		/// <summary>
+		/// Converts a string in the format "XxY" to a Point(X, Y)
+		/// </summary>
+		/// <param name="input">The input string in XxY format</param>
+		/// <returns></returns>
+		public static Point XxYToPoint(string input = "") {
+			if (String.IsNullOrEmpty(input)) {
+				return new Point(0, 0);
+			}
+			else {
+				//Same as the regex above, but XxY and groups x/y
+				Match SizeMatch = Regex.Match(input, @"(?<x>(?:-|)[0-9]*)x(?<y>(?:-|)[0-9]*)");
+				return new Point(Convert.ToInt32(SizeMatch.Groups["x"].Value.ToString())
+								, Convert.ToInt32(SizeMatch.Groups["y"].Value.ToString()));
+			}
+		}
+		#endregion
 	}
 
 
