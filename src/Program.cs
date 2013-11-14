@@ -7,11 +7,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows.Forms;
 using System.Text.RegularExpressions;
+
 using FFS;
 using NDesk.Options;
-
-//TODO
-// ADD A LOT OF COMMENTS god dammit
 
 namespace BorderKiller {
 	class Program {
@@ -115,12 +113,14 @@ namespace BorderKiller {
 			//And finally, borderless, resize and move the given window
 			if (UsingWindow.Handle != IntPtr.Zero) {
 				Console.WriteLine("boki: Modifying window: " + UsingWindow.Title);
-				if (!DoNothing)
+
+				if (!DoNothing) //Not doing nothing, so remove window borders
 					UsingWindow.MakeBorderless(LeaveHandles);
 
+				//Got a resize string or FullScreen arg, so resize
 				if (!string.IsNullOrEmpty(SizeString) || FullScreen)
 					UsingWindow.Resize(WxHToSize(SizeString));
-
+				//Same as above but move
 				if (!string.IsNullOrEmpty(PosString) || FullScreen)
 					UsingWindow.Move(XxYToPoint(PosString));
 			}
@@ -129,6 +129,7 @@ namespace BorderKiller {
 			}
 		}
 
+		//Converts a string in the format "WIDTHxHEIGHT" to a Size(WIDTH, HEIGHT)
 		public static Size WxHToSize(string input = null) {
 			if (String.IsNullOrEmpty(input)) {
 				return new Size(Screen.PrimaryScreen.WorkingArea.Width, Screen.PrimaryScreen.WorkingArea.Height);
@@ -140,6 +141,7 @@ namespace BorderKiller {
 			}
 		}
 
+		//Same as above but "XxY" to Point(X, Y)
 		public static Point XxYToPoint(string input = null) {
 			if (String.IsNullOrEmpty(input)) {
 				return new Point(0, 0);
@@ -151,10 +153,13 @@ namespace BorderKiller {
 			}
 		}
 		
+		//Prints the version and exits
 		public static void PrintVersion() {
 			Console.WriteLine("BorderKiller v" + typeof(Program).Assembly.GetName().Version.ToString().Split('.').Take(3).Aggregate((a, b) => a + "." + b));
 			Environment.Exit(1);
 		}
+
+		//Prints help and exits
 		public static void PrintHelp(OptionSet opt) {
 			string ExeName = AppDomain.CurrentDomain.FriendlyName;
 			Console.WriteLine(@"BorderKiller v{0}
